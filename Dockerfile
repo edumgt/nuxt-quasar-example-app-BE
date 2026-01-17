@@ -1,5 +1,10 @@
-FROM eclipse-temurin:21-jdk-alpine
-RUN apk update && apk add curl && date && apk add tzdata && cp /usr/share/zoneinfo/Asia/Bangkok /etc/localtime && date
+FROM eclipse-temurin:21-jre-jammy
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl tzdata \
+    && ln -snf /usr/share/zoneinfo/Asia/Bangkok /etc/localtime \
+    && echo "Asia/Bangkok" > /etc/timezone \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 VOLUME /tmp
 EXPOSE 8080
