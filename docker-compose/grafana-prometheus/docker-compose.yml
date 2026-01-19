@@ -18,7 +18,7 @@ services:
       - linux-grafana-net
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=mysecurepassword
+      - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - linux-prometheus
 
