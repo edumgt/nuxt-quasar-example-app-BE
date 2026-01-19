@@ -4,6 +4,8 @@ init_connect='SET collation_connection = utf8mb4_unicode_ci'
 init_connect='SET NAMES utf8mb4'
 character_set_server=utf8mb4
 collation_server=utf8mb4_unicode_ci
+bind-address = 0.0.0.0
+port = 3306
 
 default-storage-engine=InnoDB
 innodb_file_per_table=1

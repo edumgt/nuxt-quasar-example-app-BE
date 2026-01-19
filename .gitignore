@@ -56,3 +56,5 @@ spring-data/logs
 # Gradle build outputs
 /build/
 /**/build/
+
+/docker-compose

@@ -2,22 +2,60 @@ services:
   mysql:
     container_name: mysql8
     image: mysql:8.3.0
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    ports:
+      - "3306:3306"
     volumes:
-      - ./conf/custom.cnf:/etc/mysql/conf.d/custom.cnf
+      - ./conf/custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
       - ./log:/var/log/mysql
       - ./datadir:/var/lib/mysql
-
+    environment:
+      # NOTE: ./datadir 가 이미 초기화되어 있으면 이 값은 "재적용"되지 않습니다.
+      MYSQL_ROOT_PASSWORD: "123456"
+      TZ: "Asia/Seoul"
     restart: always
-    ports:
-      - 3306:3306
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - mysql-net
+
+  mysql-init:
+    image: mysql:8.3.0
+    container_name: mysql8-init
+    depends_on:
+      - mysql
+    restart: "no"
     networks:
       - mysql-net
     environment:
-      MYSQL_ROOT_PASSWORD: strong_pwd
-    security_opt:
-      - seccomp:unconfined
+      MYSQL_ROOT_PASSWORD: "123456"
+    entrypoint: ["/bin/bash", "-lc"]
+    command: |
+      set -euo pipefail
+
+      echo "[mysql-init] waiting for mysql to accept connections..."
+      ok=0
+      for i in {1..60}; do
+        if mysqladmin ping -hmysql -uroot -p"${MYSQL_ROOT_PASSWORD}" --silent; then
+          ok=1
+          break
+        fi
+        sleep 2
+      done
+
+      if [ "$ok" -ne 1 ]; then
+        echo "[mysql-init] ERROR: mysql did not become ready in time" >&2
+        exit 1
+      fi
+
+      echo "[mysql-init] applying root remote grants (root@%)..."
+      mysql -hmysql -uroot -p"${MYSQL_ROOT_PASSWORD}" <<'SQL'
+      CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY '123456';
+      ALTER USER 'root'@'%' IDENTIFIED BY '123456';
+      GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+      FLUSH PRIVILEGES;
+      SQL
+
+      echo "[mysql-init] done"
 
 networks:
   mysql-net:
