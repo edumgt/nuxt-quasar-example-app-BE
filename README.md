@@ -1,5 +1,26 @@
 # Springboot rest api
 
+## 로컬 실행 스크립트 (MySQL Docker + SQL 초기화 + Spring Boot)
+
+아래 스크립트 하나로 다음 순서를 자동 수행합니다.
+1. MySQL Docker 컨테이너 생성/시작
+2. `scripts/init.sql` 실행 (DB/테이블 생성)
+3. `./gradlew bootRun` 실행
+
+```bash
+./scripts/start-mysql-and-boot.sh
+```
+
+필요 시 환경변수로 값을 덮어쓸 수 있습니다.
+
+```bash
+MYSQL_CONTAINER_NAME=spring-starter-mysql \
+MYSQL_IMAGE=mysql:8.4 \
+MYSQL_PORT=3306 \
+MYSQL_ROOT_PASSWORD=strong_pwd \
+./scripts/start-mysql-and-boot.sh
+```
+
 ## 사전에 WSL(WSL2) 설치/관리 + 여러 리눅스 배포판 설치 + Docker Desktop(WSL2) 공유 정리
 
 > 기준: Windows 10/11에서 **WSL2**를 사용하는 일반적인 케이스  
