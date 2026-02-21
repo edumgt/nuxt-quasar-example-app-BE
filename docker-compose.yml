@@ -1,47 +1,62 @@
-version: '3.9'
 services:
+  mysql:
+    image: mysql:8.4
+    container_name: spring-starter-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: strong_pwd
+      MYSQL_DATABASE: spring_starter
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - linux-app-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -pstrong_pwd --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
   linux-api-service-1:
     container_name: linux-api-service-1
     build: .
-    #image: "spring-api-service:latest"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: always
     ports:
-      - '9080:8080'
-    expose:
-      - 8080
+      - "9080:8080"
     networks:
       - linux-app-network
     environment:
-      - JAVA_OPTS=-Xmx512m -Xms512m
-    deploy:
-      resources:
-        limits:
-          cpus: "2.0"  # Max 2 CPU cores
-          memory: "2G"  # Max 2GB RAM
-        reservations:
-          cpus: "1.0"  # Reserve at least 1 CPU
-          memory: "1G"  # Reserve at least 1GB RAM
+      - SPRING_PROFILES_ACTIVE=dev
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+    depends_on:
+      mysql:
+        condition: service_healthy
     volumes:
-      - ${SPRING_DATA_DIR:-/home/ubuntu/spring-data}:/usr/spring-data
-      - ${SPRING_DATA_LOG_DIR:-/home/ubuntu/spring-data/logs}:/usr/spring-data/logs
+      # ✅ 실습 재현성 고정: 프로젝트 폴더 기준으로 마운트
+      - ./spring-data:/usr/spring-data
+
   linux-api-service-2:
     container_name: linux-api-service-2
     build: .
-    #image: "spring-api-service:latest"
     restart: always
     ports:
-      - '9081:8080'
-    expose:
-      - 8080
+      - "9081:8080"
     networks:
       - linux-app-network
-    volumes:
-      - ${SPRING_DATA_DIR:-/home/ubuntu/spring-data}:/usr/spring-data
-      - ${SPRING_DATA_LOG_DIR:-/home/ubuntu/spring-data/logs}:/usr/spring-data/logs
     environment:
-      - JAVA_OPTS=-Xmx512m -Xms512m
+      - SPRING_PROFILES_ACTIVE=dev
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./spring-data:/usr/spring-data
+
 networks:
   linux-app-network:
     driver: bridge
+
+volumes:
+  mysql_data:

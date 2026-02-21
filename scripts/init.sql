@@ -1,4 +1,4 @@
--- init.sql
+-- scripts/init.sql
 CREATE DATABASE IF NOT EXISTS spring_starter;
 USE spring_starter;
 
@@ -18,7 +18,7 @@ WHERE NOT EXISTS (
 );
 
 -- =========================================================
--- 1) Core tables for JWT login flow
+-- 1) Core tables
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS `user` (
@@ -68,9 +68,10 @@ CREATE TABLE IF NOT EXISTS user_agent (
     KEY idx_user_agent_agent (agent)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ✅ login_log: snake_case(user_agent)로 통일
 CREATE TABLE IF NOT EXISTS login_log (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    userAgent BIGINT NULL,
+    user_agent BIGINT NULL,
     login_from TINYINT(1) NULL,
     ip VARCHAR(50) NULL,
     host_name VARCHAR(100) NULL,
@@ -80,11 +81,15 @@ CREATE TABLE IF NOT EXISTS login_log (
 
     KEY idx_login_log_device (device_id),
     KEY idx_login_log_user (`user`),
-    KEY idx_login_log_user_agent (userAgent),
-    CONSTRAINT fk_login_log_user FOREIGN KEY (`user`) REFERENCES `user`(id) ON DELETE SET NULL,
-    CONSTRAINT fk_login_log_user_agent FOREIGN KEY (userAgent) REFERENCES user_agent(id) ON DELETE SET NULL
+    KEY idx_login_log_user_agent (user_agent),
+
+    CONSTRAINT fk_login_log_user
+      FOREIGN KEY (`user`) REFERENCES `user`(id) ON DELETE SET NULL,
+    CONSTRAINT fk_login_log_user_agent
+      FOREIGN KEY (user_agent) REFERENCES user_agent(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ✅ access_token (로그인 성공 시 INSERT되는 테이블)
 CREATE TABLE IF NOT EXISTS access_token (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     token VARCHAR(100) NOT NULL,
@@ -106,12 +111,14 @@ CREATE TABLE IF NOT EXISTS access_token (
     KEY idx_access_token_login_log (login_log),
     KEY idx_access_token_revoked (revoked),
 
-    CONSTRAINT fk_access_token_user FOREIGN KEY (`user`) REFERENCES `user`(id) ON DELETE CASCADE,
-    CONSTRAINT fk_access_token_api_client FOREIGN KEY (api_client) REFERENCES api_client(id) ON DELETE SET NULL,
-    CONSTRAINT fk_access_token_login_log FOREIGN KEY (login_log) REFERENCES login_log(id) ON DELETE SET NULL
+    CONSTRAINT fk_access_token_user
+      FOREIGN KEY (`user`) REFERENCES `user`(id) ON DELETE CASCADE,
+    CONSTRAINT fk_access_token_api_client
+      FOREIGN KEY (api_client) REFERENCES api_client(id) ON DELETE SET NULL,
+    CONSTRAINT fk_access_token_login_log
+      FOREIGN KEY (login_log) REFERENCES login_log(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Optional table referenced by User many-to-many mapping
 CREATE TABLE IF NOT EXISTS user_role (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     `user` BIGINT NOT NULL,
@@ -119,26 +126,63 @@ CREATE TABLE IF NOT EXISTS user_role (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_user_role (`user`, role),
     KEY idx_user_role_user (`user`),
-    CONSTRAINT fk_user_role_user FOREIGN KEY (`user`) REFERENCES `user`(id) ON DELETE CASCADE
+    CONSTRAINT fk_user_role_user
+      FOREIGN KEY (`user`) REFERENCES `user`(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================
--- 2) Seed data for login test
---   공통 평문 비밀번호: 1234
---   bcrypt hash: $2a$10$VvK6.mMEdt9sdEjIFE.g8uN4I33dbV9luiFkhGV773wPIBHLEamhe
+-- ✅ 자동 보정: 과거 스키마가 camelCase(userAgent)로 만들어진 경우 교정
+--    (이미 user_agent면 아무 것도 안 함)
+-- =========================================================
+SET @has_userAgent :=
+  (SELECT COUNT(*)
+   FROM information_schema.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'login_log'
+     AND COLUMN_NAME = 'userAgent');
+
+SET @has_user_agent :=
+  (SELECT COUNT(*)
+   FROM information_schema.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'login_log'
+     AND COLUMN_NAME = 'user_agent');
+
+SET @sql := IF(@has_userAgent = 1 AND @has_user_agent = 0,
+  'ALTER TABLE login_log
+     DROP FOREIGN KEY fk_login_log_user_agent,
+     DROP INDEX idx_login_log_user_agent,
+     CHANGE userAgent user_agent BIGINT NULL,
+     ADD KEY idx_login_log_user_agent (user_agent),
+     ADD CONSTRAINT fk_login_log_user_agent FOREIGN KEY (user_agent) REFERENCES user_agent(id) ON DELETE SET NULL',
+  'SELECT 1'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- =========================================================
+-- 2) Seed data (login test: password=1234)
 -- =========================================================
 INSERT INTO api_client (api_name, api_token, by_pass, status)
 SELECT 'default', '10b7b78c-6544-4a04-9839-8f8c10d9445e', TRUE, TRUE
 WHERE NOT EXISTS (SELECT 1 FROM api_client WHERE api_name = 'default');
 
 INSERT INTO `user` (email, username, password, active, deleted, salt, status)
-SELECT 'admin@mydomain.com', 'admin', '$2a$10$VvK6.mMEdt9sdEjIFE.g8uN4I33dbV9luiFkhGV773wPIBHLEamhe', TRUE, FALSE, '0d1af063-ed5c-4387-91b2-04292799b06c', 'ACTIVE'
+SELECT 'admin@mydomain.com', 'admin',
+       '$2a$10$VvK6.mMEdt9sdEjIFE.g8uN4I33dbV9luiFkhGV773wPIBHLEamhe',
+       TRUE, FALSE, '0d1af063-ed5c-4387-91b2-04292799b06c', 'ACTIVE'
 WHERE NOT EXISTS (SELECT 1 FROM `user` WHERE username='admin');
 
 INSERT INTO `user` (email, username, password, active, deleted, salt, status)
-SELECT 'manager@mydomain.com', 'manager', '$2a$10$VvK6.mMEdt9sdEjIFE.g8uN4I33dbV9luiFkhGV773wPIBHLEamhe', TRUE, FALSE, '84e85f3b-2eb8-42d2-9c22-8e521e8f79c8', 'ACTIVE'
+SELECT 'manager@mydomain.com', 'manager',
+       '$2a$10$VvK6.mMEdt9sdEjIFE.g8uN4I33dbV9luiFkhGV773wPIBHLEamhe',
+       TRUE, FALSE, '84e85f3b-2eb8-42d2-9c22-8e521e8f79c8', 'ACTIVE'
 WHERE NOT EXISTS (SELECT 1 FROM `user` WHERE username='manager');
 
 INSERT INTO `user` (email, username, password, active, deleted, salt, status)
-SELECT 'tester@mydomain.com', 'tester', '$2a$10$VvK6.mMEdt9sdEjIFE.g8uN4I33dbV9luiFkhGV773wPIBHLEamhe', TRUE, FALSE, '293a5422-3d37-46dd-9476-3898b9e6d2db', 'ACTIVE'
+SELECT 'tester@mydomain.com', 'tester',
+       '$2a$10$VvK6.mMEdt9sdEjIFE.g8uN4I33dbV9luiFkhGV773wPIBHLEamhe',
+       TRUE, FALSE, '293a5422-3d37-46dd-9476-3898b9e6d2db', 'ACTIVE'
 WHERE NOT EXISTS (SELECT 1 FROM `user` WHERE username='tester');
