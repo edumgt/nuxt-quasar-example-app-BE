@@ -6,6 +6,22 @@
 > PowerShell(관리자 권한)에서 실행해야 하는 명령은 ✅로 표시했습니다.
 
 ---
+```
+sudo tee /etc/wsl.conf >/dev/null <<'EOF'
+[boot]
+systemd=true
+
+[user]
+default=root
+
+[automount]
+enabled=true
+options = "metadata,umask=22,fmask=11"
+mountFsTab=true
+EOF
+```
+
+---
 
 ## 0) 빠른 결론 (Docker Desktop + WSL2)
 - **Docker Desktop + WSL2 백엔드 + WSL Integration 사용**이면  
@@ -186,12 +202,6 @@ WSL(리눅스) 안에서:
 ```bash
 sudo apt update
 sudo apt upgrade -y
-```
-
-### 9-3) openSUSE 계열 예시
-```bash
-sudo zypper refresh
-sudo zypper update -y
 ```
 
 ---
