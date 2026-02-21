@@ -327,12 +327,7 @@ Only supported on Java 1.8 and up, MySql 8 and up.
 
 ## Usage
 
-### 1. Download this repository
-```git
-git clone https://github.com/bekaku/java-spring-boot-starter my-app
-```
 
-Repository will be downloaded into `my-app/` folder
 ## Database
 
 Database file located at `my-app`/spring-data/files/spring_starter.sql and you can use following command for restore to your db.
